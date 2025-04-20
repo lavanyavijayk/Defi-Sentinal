@@ -4,9 +4,9 @@ import json
 from google.cloud import pubsub_v1
 
 BITQUERY_API_URL = "https://graphql.bitquery.io"
-BITQUERY_API_KEY = "59de9867-ce4d-4893-94af-eb832460409b"
-ACCESS_TOKEN = "ory_at_Ur7NCsdfszp8Of6sHKT2gVtjuBHO21eD2-mj81wGxRQ.HSdz6lFva2FnnWY3sultSILN9DdJ5U_sLnTOkGkjT5g"
-PROJECT_ID = "defi-sentinal"
+BITQUERY_API_KEY = ""
+ACCESS_TOKEN = ""
+PROJECT_ID = ""
 TOPIC_ID = "data-topic"
 
 
