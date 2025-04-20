@@ -1,0 +1,4 @@
+apache-beam[gcp]==2.64.0
+wheel==0.45.1
+numpy==1.26.4
+scikit-learn

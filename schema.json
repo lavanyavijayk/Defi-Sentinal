@@ -1,0 +1,129 @@
+[
+    {
+      "name": "protocol",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "DEX protocol name (e.g., Uniswap v2)"
+    },
+    {
+      "name": "block_timestamp",
+      "type": "TIMESTAMP",
+      "mode": "NULLABLE",
+      "description": "Block timestamp in human-readable format"
+    },
+    {
+      "name": "block_unixtime",
+      "type": "INTEGER",
+      "mode": "NULLABLE",
+      "description": "Block timestamp in Unix time"
+    },
+    {
+      "name": "block_height",
+      "type": "INTEGER",
+      "mode": "NULLABLE",
+      "description": "Block height"
+    },
+    {
+      "name": "tx_hash",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "Transaction hash"
+    },
+    {
+      "name": "buy_currency",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "Symbol of the currency bought"
+    },
+    {
+      "name": "buy_address",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "Contract address of the currency bought"
+    },
+    {
+      "name": "buy_amount",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Amount of currency bought"
+    },
+    {
+      "name": "sell_currency",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "Symbol of the currency sold"
+    },
+    {
+      "name": "sell_address",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "Contract address of the currency sold"
+    },
+    {
+      "name": "sell_amount",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Amount of currency sold"
+    },
+    {
+      "name": "trade_ratio",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Ratio of sell_amount / buy_amount"
+    },
+    {
+      "name": "gas_value",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Gas value used by the transaction"
+    },
+    {
+      "name": "gas_price",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Gas price for the transaction"
+    },
+    {
+      "name": "gas_cost_relative",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Gas cost relative to the transaction value"
+    },
+    {
+      "name": "time_of_day_sin",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Sine transformation of time of day (cyclical feature)"
+    },
+    {
+      "name": "time_of_day_cos",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Cosine transformation of time of day (cyclical feature)"
+    },
+    {
+      "name": "anomaly_score",
+      "type": "FLOAT",
+      "mode": "NULLABLE",
+      "description": "Anomaly score from detection algorithm"
+    },
+    {
+      "name": "detection_time",
+      "type": "TIMESTAMP",
+      "mode": "NULLABLE",
+      "description": "Time when the anomaly was detected"
+    },
+    {
+      "name": "reason",
+      "type": "STRING",
+      "mode": "NULLABLE",
+      "description": "Reason for flagging the transaction as anomalous"
+    },
+    {
+      "name": "analyzed",
+      "type": "BOOLEAN",
+      "mode": "NULLABLE",
+      "defaultValueExpression": "false",
+      "description": "Flag indicating whether the transaction has been analyzed"
+    }
+  ]

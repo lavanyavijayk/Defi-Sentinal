@@ -1,0 +1,132 @@
+[
+  {
+    "name": "protocol",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "block",
+    "type": "RECORD",
+    "mode": "REQUIRED",
+    "fields": [
+      {
+        "name": "timestamp",
+        "type": "RECORD",
+        "mode": "REQUIRED",
+        "fields": [
+          {
+            "name": "time",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "unixtime",
+            "type": "INTEGER",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      {
+        "name": "height",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+      }
+    ]
+  },
+  {
+    "name": "transaction",
+    "type": "RECORD",
+    "mode": "REQUIRED",
+    "fields": [
+      {
+        "name": "hash",
+        "type": "STRING",
+        "mode": "NULLABLE"
+      }
+    ]
+  },
+  {
+    "name": "buyCurrency",
+    "type": "RECORD",
+    "mode": "REQUIRED",
+    "fields": [
+      {
+        "name": "symbol",
+        "type": "STRING",
+        "mode": "NULLABLE"
+      },
+      {
+        "name": "address",
+        "type": "STRING",
+        "mode": "NULLABLE"
+      }
+    ]
+  },
+  {
+    "name": "buyAmount",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "sellCurrency",
+    "type": "RECORD",
+    "mode": "NULLABLE",
+    "fields": [
+      {
+        "name": "symbol",
+        "type": "STRING",
+        "mode": "NULLABLE"
+      },
+      {
+        "name": "address",
+        "type": "STRING",
+        "mode": "NULLABLE"
+      }
+    ]
+  },
+  {
+    "name": "sellAmount",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "trades",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "trader_address",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "evaluation",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "transactions_in_window",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "is_rapid_transaction",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "is_flash_trade",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "is_same_token",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "is_fraud",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED"
+  }
+]
