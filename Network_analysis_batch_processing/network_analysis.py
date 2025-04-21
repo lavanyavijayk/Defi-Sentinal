@@ -36,15 +36,16 @@ def load_transactions(analyzed_filter=None):
         df = spark.read \
             .format("bigquery") \
             .option("table", "defi-sentinal.streaming_dataset.trades_table") \
-            .option("filter", f"analyzed = {str(analyzed_filter).lower()}") \
+            .option("filter", f"analyzed = {str(analyzed_filter).lower()} AND detection_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE)") \
             .load()
-        logger.info(f"Loaded transactions with analyzed={analyzed_filter}")
+        logger.info(f"Loaded transactions with analyzed={analyzed_filter} and detection_time within last 90 minutes")
     else:
         df = spark.read \
             .format("bigquery") \
             .option("table", "defi-sentinal.streaming_dataset.trades_table") \
+            .option("filter", "detection_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE)") \
             .load()
-        logger.info("Loaded all transactions")
+        logger.info("Loaded all transactions from the last 90 minutes")
     
     return df
 
@@ -633,31 +634,6 @@ def save_results(network_results, anomaly_results, transactions_df):
     
     # Combine all transaction updates
     all_anomaly_updates = cluster_tx_updates.union(high_ratio_tx_updates).union(low_ratio_tx_updates).distinct()
-    
-    # Create a DataFrame for all processed transactions
-    all_processed = transactions_df.select("tx_hash").distinct() \
-        .withColumn("analyzed", lit(True)) \
-        .withColumn("detection_time", current_timestamp())
-    
-    # Add anomaly scores and reasons to the processed transactions
-    all_processed_with_scores = all_processed.join(
-        all_anomaly_updates.select("tx_hash", "anomaly_score", "reason"), 
-        "tx_hash", 
-        "left"
-    )
-    
-    # Add analysis_timestamp to processed transactions
-    all_processed_with_scores = all_processed_with_scores.withColumn(
-        "analysis_timestamp", current_timestamp().cast(TimestampType())
-    )
-    
-    # Write transaction updates back to BigQuery
-    all_processed_with_scores.write \
-        .format("bigquery") \
-        .option("table", "defi-sentinal.graph_based_anomaly.processed_transactions") \
-        .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
-        .save()
     
     # Add analysis_timestamp to anomalous transactions
     all_anomaly_updates = all_anomaly_updates.withColumn(
