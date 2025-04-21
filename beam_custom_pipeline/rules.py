@@ -3,7 +3,7 @@ from apache_beam.options.pipeline_options import PipelineOptions
 import logging
 import json
 
-# Enhanced logging setup
+# logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 class UserOptions(PipelineOptions):
@@ -351,7 +351,7 @@ def run():
         deduped_in_window = (
             features
             | "Fixed Window 1m" >> beam.WindowInto(
-                beam.window.FixedWindows(5),
+                beam.window.FixedWindows(60),
                 accumulation_mode=beam.trigger.AccumulationMode.ACCUMULATING
             )
             | "Key By UniqueId" >> beam.Map(lambda x: (x['unique_id'], x))

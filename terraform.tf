@@ -582,46 +582,6 @@ resource "google_bigquery_table" "anomalous_transactions" {
   depends_on          = [google_bigquery_dataset.graph_based_anomaly]
 }
 
-# Processed transactions tracking table
-resource "google_bigquery_table" "processed_transactions" {
-  dataset_id = google_bigquery_dataset.graph_based_anomaly.dataset_id
-  table_id   = "processed_transactions"
-  schema = jsonencode([
-    {
-      "name": "tx_hash",
-      "type": "STRING",
-      "mode": "NULLABLE",
-      "description": "Transaction hash"
-    },
-    {
-      "name": "analyzed",
-      "type": "BOOLEAN",
-      "mode": "NULLABLE",
-      "description": "Whether the transaction has been analyzed"
-    },
-    {
-      "name": "detection_time",
-      "type": "TIMESTAMP",
-      "mode": "NULLABLE",
-      "description": "When the transaction was processed"
-    },
-    {
-      "name": "anomaly_score",
-      "type": "FLOAT",
-      "mode": "NULLABLE",
-      "description": "Anomaly score if anomalous, null otherwise"
-    },
-    {
-      "name": "reason",
-      "type": "STRING",
-      "mode": "NULLABLE",
-      "description": "Reason for flagging as anomalous, if applicable"
-    }
-  ])
-  deletion_protection = false
-  depends_on          = [google_bigquery_dataset.graph_based_anomaly]
-}
-
 # Create a scheduled job to run the analysis periodically
 resource "google_dataproc_workflow_template" "dex_analysis_template" {
   name        = "dex-analysis-workflow"
