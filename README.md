@@ -38,14 +38,14 @@ This repository contains the following key components:
   - Community detection for identifying related trading groups
   - Clustering for finding anomalous behavior patterns
 
-### 4. Integration and Infrastructure (`/infrastructure/`)
+### 4. Integration and Infrastructure
 
 - **`terraform.tf`**: Infrastructure as Code for deploying the complete system
 
 ### 5. Database Schema
 
--**`schema.json`**: Schema for the bigquery streaming data table
--**`schema_batch_processing.json`**: Schema for the bigquery rule based batch processing data table
+ - **`schema.json`**: Schema for the bigquery streaming data table
+ - **`schema_batch_processing.json`**: Schema for the bigquery rule based batch processing data table
 
 ## Getting Started
 
