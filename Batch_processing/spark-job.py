@@ -296,6 +296,13 @@ def main():
         df_processed = df_with_timestamps.withColumn("transactions_in_window", lit(1)) \
             .withColumn("is_rapid_transaction", lit(False))
     
+    # Update is_fraud to include all fraud indicators (is_flash_trade, is_same_token, is_rapid_transaction, and evaluation=='Invalid')
+    df_processed = df_processed.withColumn(
+        "is_fraud",
+        (col("is_flash_trade") | col("is_same_token") | col("is_rapid_transaction") | 
+         (col("evaluation") == "Invalid")).cast("boolean")
+    )
+    
     # Select the final columns in the order expected by BigQuery
     # Drop the fraud_detection map and timestamp_unix which were used for internal processing
     final_df = df_processed.select(
