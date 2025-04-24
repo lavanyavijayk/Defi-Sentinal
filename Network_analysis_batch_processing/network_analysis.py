@@ -4,10 +4,10 @@ import pyspark.sql.functions as F
 import numpy as np
 from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.clustering import KMeans
-from pyspark.sql.functions import udf, lit, current_timestamp, coalesce
+from pyspark.sql.functions import udf, lit, current_timestamp, coalesce, broadcast
 import datetime
 import traceback
-from pyspark.sql.types import DoubleType, IntegerType, StringType, TimestampType
+from pyspark.sql.types import DoubleType, IntegerType, StringType, TimestampType, StructType, StructField
 
 # Initialize Spark session with GraphFrames
 spark = SparkSession.builder \
@@ -33,13 +33,24 @@ def load_transactions(analyzed_filter=None):
     logger.info("Loading transactions from BigQuery")
     
     if analyzed_filter is not None:
-        df = spark.read \
-            .format("bigquery") \
-            .option("table", "defi-sentinal.streaming_dataset.trades_table") \
-            .option("filter", f"analyzed = {str(analyzed_filter).lower()} AND detection_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE)") \
-            .load()
-        logger.info(f"Loaded transactions with analyzed={analyzed_filter} and detection_time within last 90 minutes")
+        if analyzed_filter == False:
+            # For unanalyzed data older than 90 minutes
+            df = spark.read \
+                .format("bigquery") \
+                .option("table", "defi-sentinal.streaming_dataset.trades_table") \
+                .option("filter", f"analyzed = {str(analyzed_filter).lower()} AND detection_time < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE)") \
+                .load()
+            logger.info(f"Loaded unanalyzed transactions with detection_time older than 90 minutes")
+        else:
+            # For analyzed data with normal 90-minute recent window
+            df = spark.read \
+                .format("bigquery") \
+                .option("table", "defi-sentinal.streaming_dataset.trades_table") \
+                .option("filter", f"analyzed = {str(analyzed_filter).lower()} AND detection_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE)") \
+                .load()
+            logger.info(f"Loaded analyzed transactions with detection_time within last 90 minutes")
     else:
+        # For all data regardless of analyzed status
         df = spark.read \
             .format("bigquery") \
             .option("table", "defi-sentinal.streaming_dataset.trades_table") \
@@ -311,10 +322,32 @@ def run_anomaly_detection(graph, vertices, edges, transactions_df):
         (F.col("transactions_sent") > 5)
     )
     
+    # Make sure ID column is properly typed and not null
+    high_ratio_anomalies = high_ratio_anomalies.withColumn("id", F.col("id").cast(StringType()))
+    high_ratio_anomalies = high_ratio_anomalies.filter(
+        (F.col("id").isNotNull()) & (F.length("id") > 0)
+    )
+    
+    # Log the state of high_ratio_anomalies
+    logger.info(f"High ratio anomalies count: {high_ratio_anomalies.count()}")
+    logger.info("High ratio anomalies schema:")
+    high_ratio_anomalies.printSchema()
+    
+    # Sample some records to verify IDs
+    logger.info("Sample high ratio anomalies IDs:")
+    if high_ratio_anomalies.count() > 0:
+        high_ratio_anomalies.select("id").show(5, False)
+    
     low_ratio_anomalies = volume_ratio_anomalies.filter(
         (F.col("volume_ratio") < 0.1) & 
         (F.col("received_volume") > 0) &
         (F.col("transactions_received") > 5)
+    )
+    
+    # Also ensure consistency for low_ratio_anomalies (same as what we're doing for high_ratio)
+    low_ratio_anomalies = low_ratio_anomalies.withColumn("id", F.col("id").cast(StringType()))
+    low_ratio_anomalies = low_ratio_anomalies.filter(
+        (F.col("id").isNotNull()) & (F.length("id") > 0)
     )
     
     logger.info(f"Found {cluster_anomalies.count()} cluster-based anomalies, " +
@@ -441,7 +474,7 @@ def setup_bigquery_tables_and_save_graph(graph, tmp_bucket):
         .format("bigquery") \
         .option("table", f"defi-sentinal.{dataset_id}.{vertices_table_id}") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     # Save edges with all their attributes for visualization
@@ -449,7 +482,7 @@ def setup_bigquery_tables_and_save_graph(graph, tmp_bucket):
         .format("bigquery") \
         .option("table", f"defi-sentinal.{dataset_id}.{edges_table_id}") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     logger.info("Graph structure saved to BigQuery successfully")
@@ -462,7 +495,7 @@ def setup_bigquery_tables_and_save_graph(graph, tmp_bucket):
 
 def save_results(network_results, anomaly_results, transactions_df):
     """Save analysis results to BigQuery"""
-    from pyspark.sql.types import DoubleType, IntegerType, StringType, TimestampType
+    from pyspark.sql.types import DoubleType, IntegerType, StringType, TimestampType, StructType, StructField
     logger.info("Saving results to BigQuery")
     
     # Use the bucket name only, without the gs:// prefix or any paths
@@ -478,7 +511,7 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.network_analysis_dataset.important_addresses") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     # Add timestamp column to in_degree_ranked
@@ -490,7 +523,7 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.network_analysis_dataset.in_degree_addresses") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     # Add timestamp column to out_degree_ranked
@@ -502,7 +535,7 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.network_analysis_dataset.out_degree_addresses") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     # Add timestamp column to community_sizes
@@ -514,7 +547,7 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.network_analysis_dataset.network_communities") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     logger.info("Community members column names:")
@@ -548,7 +581,7 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.network_analysis_dataset.community_members") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     # Add timestamp column to token_pairs
@@ -560,33 +593,57 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.network_analysis_dataset.token_pairs") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
-    # Add timestamp column to cluster_anomalies (if not already present)
+    # Add timestamp column to cluster_anomalies
     anomaly_results["cluster_anomalies"] = anomaly_results["cluster_anomalies"].withColumn(
         "detection_time", current_timestamp().cast(TimestampType())
     )
     
-    # Save anomaly detection results
+    # Save anomaly detection results to graph_based_anomalous_addresses table
     anomaly_results["cluster_anomalies"].write \
         .format("bigquery") \
         .option("table", "defi-sentinal.graph_based_anomaly.graph_based_anomalous_addresses") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
-    # Add timestamp column to volume_ratio_high
-    anomaly_results["volume_ratio_high"] = anomaly_results["volume_ratio_high"].withColumn(
-        "detection_time", current_timestamp().cast(TimestampType())
-    )
-    
-    anomaly_results["volume_ratio_high"].write \
-        .format("bigquery") \
-        .option("table", "defi-sentinal.graph_based_anomaly.volume_ratio_high_anomalous_addresses") \
-        .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
-        .save()
+    if anomaly_results["volume_ratio_high"].count() > 0:
+        # Check for null or invalid IDs
+        logger.info(f"Count of rows with null id in volume_ratio_high: {anomaly_results['volume_ratio_high'].filter(F.col('id').isNull()).count()}")
+        logger.info(f"Count of rows with empty id in volume_ratio_high: {anomaly_results['volume_ratio_high'].filter(F.col('id') == '').count()}")
+        
+        # Filter out any rows with null or empty IDs
+        anomaly_results["volume_ratio_high"] = anomaly_results["volume_ratio_high"].filter(
+            (F.col("id").isNotNull()) & (F.length("id") > 0)
+        )
+        
+        # Add the timestamp column
+        anomaly_results["volume_ratio_high"] = anomaly_results["volume_ratio_high"].withColumn(
+            "detection_time", current_timestamp().cast(TimestampType())
+        )
+        
+        # Show some sample IDs to verify data
+        logger.info("Sample IDs before writing volume_ratio_high:")
+        anomaly_results["volume_ratio_high"].select("id").show(5, False)
+        
+        # Only proceed with writing if we have valid records
+        record_count = anomaly_results["volume_ratio_high"].count()
+        logger.info(f"About to write {record_count} records to volume_ratio_high_anomalous_addresses")
+        
+        if record_count > 0:
+            anomaly_results["volume_ratio_high"].write \
+                .format("bigquery") \
+                .option("table", "defi-sentinal.graph_based_anomaly.volume_ratio_high_anomalous_addresses") \
+                .option("temporaryGcsBucket", tmp_bucket) \
+                .mode("append") \
+                .save()
+            logger.info(f"Successfully wrote {record_count} records to volume_ratio_high_anomalous_addresses")
+        else:
+            logger.info("No valid records to write to volume_ratio_high_anomalous_addresses")
+    else:
+        logger.info("No records to write to volume_ratio_high_anomalous_addresses")
     
     # Add timestamp column to volume_ratio_low
     anomaly_results["volume_ratio_low"] = anomaly_results["volume_ratio_low"].withColumn(
@@ -597,55 +654,7 @@ def save_results(network_results, anomaly_results, transactions_df):
         .format("bigquery") \
         .option("table", "defi-sentinal.graph_based_anomaly.volume_ratio_low_anomalous_addresses") \
         .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
-        .save()
-    
-    # Get transaction IDs associated with anomalous addresses
-    cluster_anomaly_txs = transactions_df.filter(
-        (F.col("buy_address").isin([row["id"] for row in anomaly_results["cluster_anomalies"].select("id").collect()])) |
-        (F.col("sell_address").isin([row["id"] for row in anomaly_results["cluster_anomalies"].select("id").collect()]))
-    ).select("tx_hash").distinct()
-    
-    high_ratio_txs = transactions_df.filter(
-        (F.col("buy_address").isin([row["id"] for row in anomaly_results["volume_ratio_high"].select("id").collect()])) |
-        (F.col("sell_address").isin([row["id"] for row in anomaly_results["volume_ratio_high"].select("id").collect()]))
-    ).select("tx_hash").distinct()
-    
-    low_ratio_txs = transactions_df.filter(
-        (F.col("buy_address").isin([row["id"] for row in anomaly_results["volume_ratio_low"].select("id").collect()])) |
-        (F.col("sell_address").isin([row["id"] for row in anomaly_results["volume_ratio_low"].select("id").collect()]))
-    ).select("tx_hash").distinct()
-    
-    # Prepare transaction updates
-    cluster_tx_updates = cluster_anomaly_txs.withColumn("analyzed", lit(True)) \
-        .withColumn("anomaly_score", lit(0.9)) \
-        .withColumn("detection_time", current_timestamp()) \
-        .withColumn("reason", lit("Graph-based anomaly detection"))
-    
-    high_ratio_tx_updates = high_ratio_txs.withColumn("analyzed", lit(True)) \
-        .withColumn("anomaly_score", lit(0.85)) \
-        .withColumn("detection_time", current_timestamp()) \
-        .withColumn("reason", lit("Unusual high sent-to-received volume ratio"))
-    
-    low_ratio_tx_updates = low_ratio_txs.withColumn("analyzed", lit(True)) \
-        .withColumn("anomaly_score", lit(0.82)) \
-        .withColumn("detection_time", current_timestamp()) \
-        .withColumn("reason", lit("Unusual low sent-to-received volume ratio"))
-    
-    # Combine all transaction updates
-    all_anomaly_updates = cluster_tx_updates.union(high_ratio_tx_updates).union(low_ratio_tx_updates).distinct()
-    
-    # Add analysis_timestamp to anomalous transactions
-    all_anomaly_updates = all_anomaly_updates.withColumn(
-        "analysis_timestamp", current_timestamp().cast(TimestampType())
-    )
-    
-    # Save only the anomalous transactions
-    all_anomaly_updates.write \
-        .format("bigquery") \
-        .option("table", "defi-sentinal.graph_based_anomaly.anomalous_transactions") \
-        .option("temporaryGcsBucket", tmp_bucket) \
-        .mode("overwrite") \
+        .mode("append") \
         .save()
     
     logger.info("All results saved to BigQuery")
@@ -709,6 +718,7 @@ def mark_as_analyzed(transactions_df):
         logger.error(f"Error directly updating 'analyzed' status: {str(e)}")
         logger.error(f"Stack trace: {traceback.format_exc()}")
         return 0
+
 # Main execution flow
 if __name__ == "__main__":
     try:
